@@ -70,6 +70,7 @@ import us.kbase.narrativejobservice.RpcContext;
 import us.kbase.narrativejobservice.RunJobParams;
 import us.kbase.narrativejobservice.UpdateJobParams;
 import us.kbase.narrativejobservice.subjobs.NJSCallbackServer;
+import us.kbase.narrativejobservice.sdkjobs.ShifterRunner;
 
 public class SDKLocalMethodRunner {
 
@@ -133,6 +134,8 @@ public class SDKLocalMethodRunner {
             }
             Tuple2<RunJobParams, Map<String,String>> jobInput = jobSrvClient.getJobParams(jobId);
             Map<String, String> config = jobInput.getE2();
+            if (System.getenv("CALLBACK_INTERFACE")!=null)
+                config.put(CFG_PROP_AWE_CLIENT_CALLBACK_NETWORKS, System.getenv("CALLBACK_INTERFACE"));
             ConfigurableAuthService auth = getAuth(config);
             // We couldn't validate token earlier because we didn't have auth service URL.
             AuthToken token = auth.validateToken(tokenStr);
@@ -389,10 +392,15 @@ public class SDKLocalMethodRunner {
                         "by the job runner. Local callbacks are disabled.",
                         true);
             }
-            // Calling Docker run
-            new DockerRunner(dockerURI).run(imageName, modMeth.getModule(), inputFile, token, log,
-                    outputFile, false, refDataDir, null, callbackUrl, jobId, additionalBinds,
-                    cancellationChecker, envVars);
+            // Calling Runner
+            if (System.getenv("USE_SHIFTER")!=null)
+                new ShifterRunner(dockerURI).run(imageName, modMeth.getModule(), inputFile, token, log,
+                        outputFile, refDataDir, null, callbackUrl, jobId, additionalBinds,
+                        cancellationChecker, envVars);
+            else
+                new DockerRunner(dockerURI).run(imageName, modMeth.getModule(), inputFile, token, log,
+                        outputFile, false, refDataDir, null, callbackUrl, jobId, additionalBinds,
+                        cancellationChecker, envVars);
             if (cancellationChecker.isJobCanceled()) {
                 log.logNextLine("Job was canceled", false);
                 flushLog(jobSrvClient, jobId, logLines);
